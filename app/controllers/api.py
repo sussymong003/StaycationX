@@ -85,3 +85,101 @@ def verify_password(email, token):
         return True
     else:
         return False
+
+# Q2ai
+@booking.route('/api/booking/create', methods=['POST'])
+@login_required
+def create_booking():
+    """
+    Create a new booking for the user.
+    Requires 'hotel_name' and 'check_in_date' in the form data.
+    """
+     try:
+        data = request.json
+        if data: # if using ReactJS
+            hotel_name = data['hotel_name']
+            check_in_date = data['check_in_date']
+    except: # if using python
+        hotel_name = request.form.get('hotel_name')
+        check_in_date = request.form.get('check_in_date')
+    
+    existing_package = Package.getPackage(hotel_name=hotel_name)
+    
+    if current_user is None or existing_package is None:
+        return jsonify({'error': 'Invalid user or package'}), 400
+    
+    aBooking = Booking.createBooking(check_in_date, current_user, existing_package)
+    
+    return jsonify({
+        'message': 'Booking created successfully',
+        'booking': {
+            'hotel_name': aBooking.hotel_name,
+            'check_in_date': aBooking.check_in_date,
+            'user': aBooking.current_user.email,
+            'total_cost': aBooking.current_user.total_cost
+        }
+    }), 201
+
+# Q2aii
+@booking.route('/api/booking/manage', methods=['GET'])
+@login_required
+def manage_booking():
+    """
+    Get all bookings for the current user.
+    Query parameter 'days' can be used to specify how far back to retrieve bookings.
+    """
+    days = int(request.args.get('days', '-2000'))  # Default is -2000 days
+    bookings = list(Booking.getUserBookingsFromDate(customer=current_user, from_date=date.today() + timedelta(days=days)))
+    
+    if bookings:
+        bookings.sort(key=lambda b: b.check_in_date)
+    
+    return jsonify({
+        'message': 'Bookings retrieved successfully',
+        'bookings': [{'hotel_name': b.hotel_name, 'check_in_date': b.check_in_date} for b in bookings]
+    }), 200
+
+# Q2aiii
+@booking.route('/api/booking/update', methods=['POST'])
+@login_required
+def update_booking():
+    """
+    Update an existing booking for the user.
+    Requires 'hotel_name', 'old_check_in_date', and 'check_in_date' in the form data.
+    """
+    hotel_name = request.form.get("hotel_name")
+    old_check_in_date = request.form.get("old_check_in_date")
+    new_check_in_date = request.form.get("check_in_date")
+    
+    success = Booking.updateBooking(old_check_in_date, new_check_in_date, current_user, hotel_name)
+    
+    if success:
+        return jsonify({
+            'message': 'Booking updated successfully',
+            'hotel_name': hotel_name,
+            'new_check_in_date': new_check_in_date
+        }), 200
+    else:
+        return jsonify({'error': 'Failed to update booking'}), 400
+
+# Q2aiv
+@booking.route('/api/booking/delete', methods=['POST'])
+@login_required
+def delete_booking():
+    """
+    Delete an existing booking for the user.
+    Requires 'hotel_name' and 'check_in_date' in the form data.
+    """
+    hotel_name = request.form.get("hotel_name")
+    check_in_date = request.form.get("check_in_date")
+    
+    success = Booking.deleteBooking(check_in_date, current_user, hotel_name)
+    
+    if success:
+        return jsonify({
+            'message': 'Booking deleted successfully',
+            'hotel_name': hotel_name,
+            'check_in_date': check_in_date
+        }), 200
+    else:
+        return jsonify({'error': 'Failed to delete booking'}), 400
